@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>GRIST DOOM</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000;
+    font-family:"Courier New",monospace; color:#e8b923; }
+  #wrap { position:relative; width:100%; height:100%; display:flex;
+    align-items:center; justify-content:center; }
+  canvas { image-rendering:pixelated; background:#000; max-width:100%; max-height:100%; }
+
+  /* HUD */
+  #hud { position:absolute; left:0; right:0; bottom:0; height:64px;
+    background:linear-gradient(#5a5a5a,#2a2a2a); border-top:3px solid #111;
+    display:flex; align-items:center; justify-content:space-around;
+    font-weight:bold; text-shadow:1px 1px 0 #000; user-select:none; }
+  .stat { text-align:center; line-height:1.1; }
+  .stat .lbl { font-size:11px; color:#b8b8b8; letter-spacing:1px; }
+  .stat .val { font-size:30px; color:#e8b923; }
+  #pv.low .val { color:#ff2b2b; animation:blink .4s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:.3; } }
+  #face { font-size:34px; filter:grayscale(.2); }
+
+  /* status pill */
+  #link { position:absolute; top:8px; right:10px; font-size:11px;
+    padding:3px 8px; border-radius:10px; background:#222; color:#888;
+    border:1px solid #444; z-index:5; }
+  #link.on { color:#7CFC00; border-color:#2f5; }
+  #link.off { color:#ff5555; border-color:#933; }
+
+  #msg { position:absolute; top:40px; left:50%; transform:translateX(-50%);
+    font-size:20px; color:#fff; text-shadow:2px 2px 0 #900; pointer-events:none;
+    opacity:0; transition:opacity .2s; letter-spacing:2px; z-index:4; }
+  #msg.show { opacity:1; }
+
+  #start { position:absolute; inset:0; background:rgba(0,0,0,.85);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; z-index:10; cursor:pointer; }
+  #start h1 { font-size:48px; color:#c1121f; text-shadow:3px 3px 0 #000; letter-spacing:4px; }
+  #start p { margin-top:14px; color:#e8b923; font-size:14px; max-width:420px; line-height:1.6; }
+  #start .go { margin-top:24px; font-size:18px; color:#fff; border:2px solid #e8b923;
+    padding:10px 24px; border-radius:4px; }
+  #dead { position:absolute; inset:0; background:rgba(60,0,0,.7); display:none;
+    align-items:center; justify-content:center; flex-direction:column; z-index:9; }
+  #dead h1 { font-size:64px; color:#fff; text-shadow:3px 3px 0 #900; letter-spacing:6px; }
+  #dead p { color:#e8b923; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="480" height="300"></canvas>
+
+  <div id="link" class="off">GRIST: hors-ligne</div>
+  <div id="msg"></div>
+
+  <div id="hud">
+    <div class="stat" id="pv"><div class="lbl">PV</div><div class="val">100</div></div>
+    <div class="stat"><div class="lbl">KILLS</div><div class="val" id="killsv">0</div></div>
+    <div id="face">😀</div>
+    <div class="stat"><div class="lbl">MUNITIONS</div><div class="val" id="ammov">50</div></div>
+    <div class="stat"><div class="lbl">ENNEMIS</div><div class="val" id="alivev">0</div></div>
+  </div>
+
+  <div id="dead"><h1>GAME OVER</h1><p>Édite PV dans Grist pour ressusciter…</p></div>
+
+  <div id="start">
+    <h1>GRIST&nbsp;DOOM</h1>
+    <p>Une feuille de calcul qui joue à Doom.<br>
+    <b>ZQSD / flèches</b> pour bouger · <b>A/E</b> pour tourner · <b>Espace/Clic</b> pour tirer.<br>
+    PV, munitions et ennemis vivent dans <b>Grist</b> — édite-les en direct.</p>
+    <div class="go">▶ CLIQUE POUR ENTRER EN ENFER</div>
+  </div>
+</div>
+
+<!-- Pont Grist (ignoré silencieusement hors iframe Grist) -->
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script>
+"use strict";
+/* =========================================================================
+   GRIST DOOM — raycaster autonome piloté par Grist
+   État du jeu (PV, Munitions, Kills) = table "Game" (1 ligne)
+   Ennemis = table "Monstres" (lignes X, Y, Vivant)
+   ========================================================================= */
+
+// ---------- Carte (1 = mur, 0 = vide) ----------
+const MAP = [
+  "1111111111111111",
+  "1000000000000001",
+  "1011110111101101",
+  "1010000100000101",
+  "1010110101110101",
+  "1000100000010001",
+  "1110101111010111",
+  "1000001000100001",
+  "1011101011101101",
+  "1010000000000101",
+  "1010111111110101",
+  "1000100000010001",
+  "1110101101010111",
+  "1000000100000001",
+  "1111111111111111",
+].map(r => r.split("").map(Number));
+const MH = MAP.length, MW = MAP[0].length;
+const cell = (x,y) => (x<0||y<0||x>=MW||y>=MH) ? 1 : MAP[y|0][x|0];
+
+// ---------- État ----------
+const state = {
+  px: 2.5, py: 2.5, dir: 0.0,
+  pv: 100, ammo: 50, kills: 0,
+  monsters: [],           // {id,x,y,alive,hurt}
+  started: false, dead: false,
+};
+
+// ---------- Canvas ----------
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height, HALF = H/2;
+const FOV = Math.PI/3;
+
+// ---------- Rendu raycasting (DDA) ----------
+const zbuf = new Float32Array(W);
+function render(){
+  // ciel + sol
+  ctx.fillStyle = "#4a4a5a"; ctx.fillRect(0,0,W,HALF);
+  ctx.fillStyle = "#2a1a12"; ctx.fillRect(0,HALF,W,HALF);
+
+  for (let col=0; col<W; col++){
+    const camX = 2*col/W - 1;
+    const ra = state.dir + Math.atan(camX*Math.tan(FOV/2));
+    const sin = Math.sin(ra), cos = Math.cos(ra);
+    let dist=0, hit=0, side=0;
+    // ray march (assez fin pour la démo)
+    const step = 0.01;
+    let x=state.px, y=state.py;
+    while(dist<20){
+      x += cos*step; y += sin*step; dist += step;
+      if (cell(x,y)===1){ hit=1;
+        const fx=x-Math.floor(x), fy=y-Math.floor(y);
+        side = (Math.min(fx,1-fx) < Math.min(fy,1-fy)) ? 0 : 1;
+        break; }
+    }
+    if(!hit) { zbuf[col]=20; continue; }
+    const corr = dist*Math.cos(ra-state.dir);
+    zbuf[col]=corr;
+    const wh = Math.min(H, H/corr);
+    const y0 = HALF - wh/2;
+    const shade = Math.max(0, 1 - corr/12) * (side? .7:1);
+    const r=(90*shade)|0, g=(60*shade)|0, b=(50*shade)|0;
+    ctx.fillStyle = `rgb(${r+20},${g+15},${b})`;
+    ctx.fillRect(col, y0, 1, wh);
+  }
+  drawMonsters();
+  drawGun();
+}
+
+// ---------- Sprites ennemis (billboards) ----------
+function drawMonsters(){
+  const list = state.monsters
+    .filter(m=>m.alive)
+    .map(m=>{ const dx=m.x-state.px, dy=m.y-state.py;
+      return {m, dx, dy, dist:Math.hypot(dx,dy)}; })
+    .sort((a,b)=>b.dist-a.dist);
+
+  for(const {m,dx,dy,dist} of list){
+    if(dist<0.2) continue;
+    let ang = Math.atan2(dy,dx) - state.dir;
+    while(ang> Math.PI) ang-=2*Math.PI;
+    while(ang<-Math.PI) ang+=2*Math.PI;
+    if(Math.abs(ang) > FOV/2 + 0.3) continue;
+    const sx = (0.5 + Math.tan(ang)/(2*Math.tan(FOV/2))) * W;
+    const size = Math.min(H, H/dist);
+    const y0 = HALF - size/2;
+    // corps
+    ctx.save();
+    ctx.globalAlpha = 1;
+    const w = size*0.6;
+    for(let i=0;i<w;i++){
+      const col = (sx - w/2 + i)|0;
+      if(col<0||col>=W) continue;
+      if(zbuf[col] < dist) continue;      // caché par un mur
+      ctx.fillStyle = m.hurt>0 ? "#fff" : "#7a1f1f";
+      ctx.fillRect(col, y0+size*0.15, 1, size*0.7);
+    }
+    // yeux
+    ctx.fillStyle = m.hurt>0 ? "#900" : "#ffdd33";
+    const eyeY = y0+size*0.3, eyeS = Math.max(2,size*0.06);
+    ctx.fillRect(sx-size*0.15, eyeY, eyeS, eyeS);
+    ctx.fillRect(sx+size*0.09, eyeY, eyeS, eyeS);
+    ctx.restore();
+    if(m.hurt>0) m.hurt--;
+  }
+}
+
+// ---------- Arme ----------
+let gunFlash=0;
+function drawGun(){
+  const gx=W/2, gy=H-64;
+  if(gunFlash>0){
+    ctx.fillStyle="rgba(255,230,120,"+(gunFlash/6)+")";
+    ctx.beginPath(); ctx.arc(gx, gy-40, 26, 0, 7); ctx.fill();
+    gunFlash--;
+  }
+  ctx.fillStyle="#3a3a3a";
+  ctx.fillRect(gx-14, gy-38, 28, 44);
+  ctx.fillStyle="#555";
+  ctx.fillRect(gx-6, gy-70, 12, 40);
+  // crosshair
+  ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(W/2-6,HALF); ctx.lineTo(W/2+6,HALF);
+  ctx.moveTo(W/2,HALF-6); ctx.lineTo(W/2,HALF+6); ctx.stroke();
+}
+
+// ---------- Tir ----------
+function shoot(){
+  if(state.dead) return;
+  if(state.ammo<=0){ flash("CLIC ! plus de munitions"); return; }
+  state.ammo--; gunFlash=6; pushGame();
+  // le monstre le plus proche au centre de l'écran
+  let best=null, bestDist=99;
+  for(const m of state.monsters){
+    if(!m.alive) continue;
+    const dx=m.x-state.px, dy=m.y-state.py, dist=Math.hypot(dx,dy);
+    let ang=Math.atan2(dy,dx)-state.dir;
+    while(ang>Math.PI)ang-=2*Math.PI; while(ang<-Math.PI)ang+=2*Math.PI;
+    if(Math.abs(ang)<0.12 && dist<bestDist){ best=m; bestDist=dist; }
+  }
+  if(best){
+    best.hurt=6;
+    best.alive=false;
+    state.kills++;
+    flash("💀 FRAG !");
+    killMonsterInGrist(best);
+    pushGame();
+  }
+  syncHud();
+}
+
+// ---------- Dégâts / ennemis qui approchent ----------
+let dmgTimer=0;
+function tick(dt){
+  if(state.dead) return;
+  dmgTimer+=dt;
+  for(const m of state.monsters){
+    if(!m.alive) continue;
+    const dx=state.px-m.x, dy=state.py-m.y, d=Math.hypot(dx,dy);
+    if(d<6 && d>0.6){                       // avance vers le joueur
+      const sp=0.4*dt;
+      const nx=m.x+dx/d*sp, ny=m.y+dy/d*sp;
+      if(cell(nx,m.y)===0) m.x=nx;
+      if(cell(m.x,ny)===0) m.y=ny;
+    }
+    if(d<0.9 && dmgTimer>0.8){              // touche le joueur
+      dmgTimer=0; damage(10);
+    }
+  }
+}
+function damage(n){
+  state.pv=Math.max(0,state.pv-n);
+  flash("💥 -"+n+" PV"); pushGame(); syncHud();
+  if(state.pv<=0) die();
+}
+function die(){
+  state.dead=true;
+  document.getElementById("dead").style.display="flex";
+}
+function revive(){
+  state.dead=false;
+  document.getElementById("dead").style.display="none";
+}
+
+// ---------- HUD ----------
+function flash(t){ const m=document.getElementById("msg"); m.textContent=t;
+  m.classList.add("show"); clearTimeout(m._t); m._t=setTimeout(()=>m.classList.remove("show"),900); }
+function syncHud(){
+  document.querySelector("#pv .val").textContent=state.pv;
+  document.getElementById("pv").classList.toggle("low", state.pv<=30);
+  document.getElementById("ammov").textContent=state.ammo;
+  document.getElementById("killsv").textContent=state.kills;
+  const alive=state.monsters.filter(m=>m.alive).length;
+  document.getElementById("alivev").textContent=alive;
+  document.getElementById("face").textContent =
+    state.dead? "💀" : state.pv<=30? "😱" : state.pv<=70? "😖" : "😀";
+}
+
+// ---------- Entrées ----------
+const keys={};
+addEventListener("keydown",e=>{ keys[e.key.toLowerCase()]=true;
+  if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(e.key.toLowerCase())) e.preventDefault();
+  if(e.key===" ") shoot(); });
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+cv.addEventListener("click",shoot);
+
+function input(dt){
+  if(state.dead) return;
+  const rot=2.4*dt, mv=2.6*dt;
+  if(keys["a"]||keys["arrowleft"]) state.dir-=rot;
+  if(keys["e"]||keys["arrowright"]) state.dir+=rot;
+  const c=Math.cos(state.dir), s=Math.sin(state.dir);
+  let nx=state.px, ny=state.py;
+  if(keys["z"]||keys["w"]||keys["arrowup"]){ nx+=c*mv; ny+=s*mv; }
+  if(keys["s"]||keys["arrowdown"]){ nx-=c*mv; ny-=s*mv; }
+  if(keys["q"]){ nx+=s*mv; ny-=c*mv; }
+  if(keys["d"]){ nx-=s*mv; ny+=c*mv; }
+  if(cell(nx,state.py)===0) state.px=nx;
+  if(cell(state.px,ny)===0) state.py=ny;
+}
+
+// ---------- Boucle ----------
+let last=0;
+function loop(t){
+  const dt=Math.min(0.05,(t-last)/1000||0); last=t;
+  if(state.started){ input(dt); tick(dt); render(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById("start").addEventListener("click",()=>{
+  document.getElementById("start").style.display="none";
+  state.started=true;
+  if(!GRIST_ON) seedDefaultMonsters();  // mode démo hors Grist
+  syncHud();
+});
+
+/* =========================================================================
+   PONT GRIST
+   ========================================================================= */
+let GRIST_ON=false, gristReady=false;
+let writeGuard={pv:null,ammo:null,kills:null};
+const linkEl=document.getElementById("link");
+
+function seedDefaultMonsters(){
+  state.monsters=[
+    {id:-1,x:8,y:3,alive:true,hurt:0},
+    {id:-2,x:11,y:9,alive:true,hurt:0},
+    {id:-3,x:4,y:11,alive:true,hurt:0},
+    {id:-4,x:13,y:5,alive:true,hurt:0},
+  ];
+}
+
+try {
+  if (typeof grist !== "undefined" && grist.ready) {
+    GRIST_ON=true;
+    grist.ready({ requiredAccess:"full" });
+
+    // Table "Game" (celle sur laquelle le widget est posé) → HUD
+    grist.onRecords(async (records) => {
+      gristReady=true;
+      linkEl.textContent="GRIST: connecté"; linkEl.className="on";
+      if(records && records.length){
+        const g=records[0];
+        applyGameFromGrist(g);
+      }
+      await pullMonsters();
+    });
+
+    // rafraîchit les monstres régulièrement (autre table)
+    setInterval(()=>{ if(gristReady) pullMonsters(); }, 1500);
+  }
+} catch(e){ console.warn("Grist indisponible:", e); }
+
+// Grist → jeu (avec garde anti-boucle)
+function applyGameFromGrist(g){
+  if(typeof g.PV==="number" && g.PV!==writeGuard.pv){
+    const wasDead=state.dead;
+    state.pv=g.PV;
+    if(state.pv>0 && wasDead) revive();
+    if(state.pv<=0 && !wasDead) die();
+    flash("✎ Grist: PV = "+g.PV);
+  }
+  if(typeof g.Munitions==="number" && g.Munitions!==writeGuard.ammo){
+    state.ammo=g.Munitions; flash("✎ Grist: munitions = "+g.Munitions);
+  }
+  if(typeof g.Kills==="number") state.kills=g.Kills;
+  syncHud();
+}
+
+// jeu → Grist (Game, 1 ligne). Débounce léger.
+let pushT=null;
+function pushGame(){
+  if(!GRIST_ON) return;
+  writeGuard={pv:state.pv,ammo:state.ammo,kills:state.kills};
+  clearTimeout(pushT);
+  pushT=setTimeout(async ()=>{
+    try{
+      const t=grist.getTable();
+      const data=await grist.docApi.fetchTable("Game");
+      if(data.id && data.id.length){
+        await t.update({id:data.id[0],
+          fields:{PV:state.pv,Munitions:state.ammo,Kills:state.kills}});
+      } else {
+        await t.create({fields:{PV:state.pv,Munitions:state.ammo,Kills:state.kills}});
+      }
+    }catch(e){ console.warn("pushGame",e); }
+  },120);
+}
+
+// Monstres depuis Grist → état
+async function pullMonsters(){
+  try{
+    const d=await grist.docApi.fetchTable("Monstres");
+    if(!d.id) return;
+    const seen=new Set();
+    for(let i=0;i<d.id.length;i++){
+      const id=d.id[i];
+      seen.add(id);
+      let m=state.monsters.find(o=>o.id===id);
+      const alive = d.Vivant ? !!d.Vivant[i] : true;
+      if(!m){
+        state.monsters.push({id,x:d.X[i],y:d.Y[i],alive,hurt:0});
+      } else {
+        // Grist reste maître de la position (éditable en live)
+        m.x=d.X[i]; m.y=d.Y[i];
+        if(alive && !m.alive){ m.alive=true; flash("✎ Grist: ennemi ressuscité"); }
+        else m.alive = m.alive && alive;
+      }
+    }
+    state.monsters=state.monsters.filter(m=>m.id<0 || seen.has(m.id));
+    syncHud();
+  }catch(e){ /* table absente → ignore */ }
+}
+
+async function killMonsterInGrist(m){
+  if(!GRIST_ON || m.id<0) return;
+  try{
+    await grist.docApi.applyUserActions([
+      ["UpdateRecord","Monstres",m.id,{Vivant:false}]
+    ]);
+  }catch(e){ console.warn("kill grist",e); }
+}
+</script>
+</body>
+</html>
