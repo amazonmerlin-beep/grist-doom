@@ -10,426 +10,414 @@
     font-family:"Courier New",monospace; color:#e8b923; }
   #wrap { position:relative; width:100%; height:100%; display:flex;
     align-items:center; justify-content:center; }
-  canvas { image-rendering:pixelated; background:#000; max-width:100%; max-height:100%; }
+  canvas { image-rendering:pixelated; background:#000; max-width:100%; max-height:100%; display:block; }
 
-  /* HUD */
-  #hud { position:absolute; left:0; right:0; bottom:0; height:64px;
+  #hud { position:absolute; left:0; right:0; bottom:0; height:60px;
     background:linear-gradient(#5a5a5a,#2a2a2a); border-top:3px solid #111;
     display:flex; align-items:center; justify-content:space-around;
-    font-weight:bold; text-shadow:1px 1px 0 #000; user-select:none; }
-  .stat { text-align:center; line-height:1.1; }
-  .stat .lbl { font-size:11px; color:#b8b8b8; letter-spacing:1px; }
-  .stat .val { font-size:30px; color:#e8b923; }
+    font-weight:bold; text-shadow:1px 1px 0 #000; user-select:none; z-index:3; }
+  .stat { text-align:center; line-height:1.05; }
+  .stat .lbl { font-size:10px; color:#b8b8b8; letter-spacing:1px; }
+  .stat .val { font-size:26px; color:#e8b923; }
   #pv.low .val { color:#ff2b2b; animation:blink .4s steps(2) infinite; }
   @keyframes blink { 50% { opacity:.3; } }
-  #face { font-size:34px; filter:grayscale(.2); }
+  #face { font-size:30px; }
+  #rang .val { font-size:15px; color:#7CFC00; }
 
-  /* status pill */
-  #link { position:absolute; top:8px; right:10px; font-size:11px;
-    padding:3px 8px; border-radius:10px; background:#222; color:#888;
-    border:1px solid #444; z-index:5; }
+  #link { position:absolute; top:6px; right:8px; font-size:10px; padding:2px 7px;
+    border-radius:9px; background:#222; color:#888; border:1px solid #444; z-index:5; }
   #link.on { color:#7CFC00; border-color:#2f5; }
-  #link.off { color:#ff5555; border-color:#933; }
+  #tag { position:absolute; top:6px; left:8px; font-size:11px; font-weight:bold;
+    padding:2px 8px; border-radius:9px; z-index:5; text-shadow:1px 1px 0 #000; }
 
-  #msg { position:absolute; top:40px; left:50%; transform:translateX(-50%);
-    font-size:20px; color:#fff; text-shadow:2px 2px 0 #900; pointer-events:none;
-    opacity:0; transition:opacity .2s; letter-spacing:2px; z-index:4; }
+  #msg { position:absolute; top:34px; left:50%; transform:translateX(-50%);
+    font-size:18px; color:#fff; text-shadow:2px 2px 0 #900; pointer-events:none;
+    opacity:0; transition:opacity .2s; letter-spacing:1px; z-index:4; }
   #msg.show { opacity:1; }
 
-  #start { position:absolute; inset:0; background:rgba(0,0,0,.85);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; z-index:10; cursor:pointer; }
-  #start h1 { font-size:48px; color:#c1121f; text-shadow:3px 3px 0 #000; letter-spacing:4px; }
-  #start p { margin-top:14px; color:#e8b923; font-size:14px; max-width:420px; line-height:1.6; }
-  #start .go { margin-top:24px; font-size:18px; color:#fff; border:2px solid #e8b923;
-    padding:10px 24px; border-radius:4px; }
-  #dead { position:absolute; inset:0; background:rgba(60,0,0,.7); display:none;
-    align-items:center; justify-content:center; flex-direction:column; z-index:9; }
-  #dead h1 { font-size:64px; color:#fff; text-shadow:3px 3px 0 #900; letter-spacing:6px; }
-  #dead p { color:#e8b923; margin-top:10px; }
+  #hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.35); color:#fff; font-size:16px; letter-spacing:1px;
+    text-shadow:2px 2px 0 #900; z-index:6; transition:opacity .4s; pointer-events:none; text-align:center; }
+  #hint.hide { opacity:0; }
+  #dead { position:absolute; inset:0; background:rgba(60,0,0,.72); display:none;
+    align-items:center; justify-content:center; flex-direction:column; z-index:7; }
+  #dead h1 { font-size:52px; color:#fff; text-shadow:3px 3px 0 #900; letter-spacing:5px; }
+  #dead p { color:#e8b923; margin-top:8px; font-size:13px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <canvas id="c" width="480" height="300"></canvas>
-
-  <div id="link" class="off">GRIST: hors-ligne</div>
+  <canvas id="c" width="480" height="300" tabindex="0"></canvas>
+  <div id="link">GRIST: …</div>
+  <div id="tag">P?</div>
   <div id="msg"></div>
-
+  <div id="hint">🎯 clique pour prendre les commandes<br><span style="font-size:12px;color:#e8b923">ZQSD/flèches · A/E tourner · Espace/clic tirer · R respawn</span></div>
+  <div id="dead"><h1>GAME OVER</h1><p>Édite <b>PV</b> dans Grist (ou appuie sur R) pour ressusciter…</p></div>
   <div id="hud">
     <div class="stat" id="pv"><div class="lbl">PV</div><div class="val">100</div></div>
-    <div class="stat"><div class="lbl">KILLS</div><div class="val" id="killsv">0</div></div>
-    <div id="face">😀</div>
     <div class="stat"><div class="lbl">MUNITIONS</div><div class="val" id="ammov">50</div></div>
+    <div id="face">😀</div>
+    <div class="stat"><div class="lbl">KILLS</div><div class="val" id="killsv">0</div></div>
+    <div class="stat" id="rang"><div class="lbl">RANG</div><div class="val" id="rangv">—</div></div>
     <div class="stat"><div class="lbl">ENNEMIS</div><div class="val" id="alivev">0</div></div>
-  </div>
-
-  <div id="dead"><h1>GAME OVER</h1><p>Édite PV dans Grist pour ressusciter…</p></div>
-
-  <div id="start">
-    <h1>GRIST&nbsp;DOOM</h1>
-    <p>Une feuille de calcul qui joue à Doom.<br>
-    <b>ZQSD / flèches</b> pour bouger · <b>A/E</b> pour tourner · <b>Espace/Clic</b> pour tirer.<br>
-    PV, munitions et ennemis vivent dans <b>Grist</b> — édite-les en direct.</p>
-    <div class="go">▶ CLIQUE POUR ENTRER EN ENFER</div>
   </div>
 </div>
 
-<!-- Pont Grist (ignoré silencieusement hors iframe Grist) -->
 <script src="https://grist.numerique.gouv.fr/grist-plugin-api.js"></script>
 <script>
 "use strict";
-/* =========================================================================
-   GRIST DOOM — raycaster autonome piloté par Grist
-   État du jeu (PV, Munitions, Kills) = table "Game" (1 ligne)
-   Ennemis = table "Monstres" (lignes X, Y, Vivant)
-   ========================================================================= */
+/* ===================================================================
+   GRIST DOOM — widget unifié piloté par Grist
+   Tables: Game (HUD+pos joueur 1) · Carte (murs) · Monstres+Types
+           · Joueurs (multi) · Leaderboard
+   Multijoueur: ?p=1 (défaut) ou ?p=2  →  ligne Joueurs correspondante
+   =================================================================== */
 
-// ---------- Carte (1 = mur, 0 = vide) ----------
-const MAP = [
-  "1111111111111111",
-  "1000000000000001",
-  "1011110111101101",
-  "1010000100000101",
-  "1010110101110101",
-  "1000100000010001",
-  "1110101111010111",
-  "1000001000100001",
-  "1011101011101101",
-  "1010000000000101",
-  "1010111111110101",
-  "1000100000010001",
-  "1110101101010111",
-  "1000000100000001",
-  "1111111111111111",
-].map(r => r.split("").map(Number));
-const MH = MAP.length, MW = MAP[0].length;
-const cell = (x,y) => (x<0||y<0||x>=MW||y>=MH) ? 1 : MAP[y|0][x|0];
+const PID = Math.max(1, parseInt(new URLSearchParams(location.search).get('p')||'1',10)||1);
+const PRIMARY = (PID === 1);
 
-// ---------- État ----------
-const state = {
-  px: 1.5, py: 1.5, dir: 0.0,
-  pv: 100, ammo: 50, kills: 0,
-  monsters: [],           // {id,x,y,alive,hurt}
-  started: false, dead: false,
+// ---- carte par défaut (fallback si table Carte absente) ----
+const MAP0 = [
+  "1111111111111111","1000000000000001","1011110111101101","1010000100000101",
+  "1010110101110101","1000100000010001","1110101111010111","1000001000100001",
+  "1011101011101101","1010000000000101","1010111111110101","1000100000010001",
+  "1110101101010111","1000000100000001","1111111111111111",
+].map(r=>r.split("").map(Number));
+
+const S = {
+  px:1.5, py:1.5, dir:0,
+  pv:100, ammo:50, kills:0, rang:"",
+  map:MAP0, mw:MAP0[0].length, mh:MAP0.length,
+  monsters:[], others:[],
+  dead:false, deadLogged:false, focused:false,
+  gameId:1, myColor: PRIMARY? "#39d353":"#58a6ff", myName:"Joueur "+PID,
 };
+const cellAt=(x,y)=>{ x|=0; y|=0; if(x<0||y<0||x>=S.mw||y>=S.mh) return 1;
+  const row=S.map[y]; return (row&&row[x])?1:0; };
 
 // ---------- Canvas ----------
-const cv = document.getElementById("c"), ctx = cv.getContext("2d");
-const W = cv.width, H = cv.height, HALF = H/2;
-const FOV = Math.PI/3;
+const cv=document.getElementById("c"), ctx=cv.getContext("2d");
+const W=cv.width, H=cv.height, HALF=H/2, FOV=Math.PI/3;
+const zbuf=new Float32Array(W);
 
-// ---------- Rendu raycasting (DDA) ----------
-const zbuf = new Float32Array(W);
 function render(){
-  // ciel + sol
-  ctx.fillStyle = "#4a4a5a"; ctx.fillRect(0,0,W,HALF);
-  ctx.fillStyle = "#2a1a12"; ctx.fillRect(0,HALF,W,HALF);
-
-  for (let col=0; col<W; col++){
-    const camX = 2*col/W - 1;
-    const ra = state.dir + Math.atan(camX*Math.tan(FOV/2));
-    const sin = Math.sin(ra), cos = Math.cos(ra);
-    let dist=0, hit=0, side=0;
-    // ray march (assez fin pour la démo)
-    const step = 0.01;
-    let x=state.px, y=state.py;
-    while(dist<20){
-      x += cos*step; y += sin*step; dist += step;
-      if (cell(x,y)===1){ hit=1;
+  ctx.fillStyle="#4a4a5a"; ctx.fillRect(0,0,W,HALF);
+  ctx.fillStyle="#2a1a12"; ctx.fillRect(0,HALF,W,HALF);
+  const tanF=Math.tan(FOV/2);
+  for(let col=0; col<W; col++){
+    const camX=2*col/W-1;
+    const ra=S.dir+Math.atan(camX*tanF);
+    const cos=Math.cos(ra), sin=Math.sin(ra);
+    let dist=0, hit=0, side=0, x=S.px, y=S.py;
+    const step=0.02;
+    while(dist<24){
+      x+=cos*step; y+=sin*step; dist+=step;
+      if(cellAt(x,y)===1){ hit=1;
         const fx=x-Math.floor(x), fy=y-Math.floor(y);
-        side = (Math.min(fx,1-fx) < Math.min(fy,1-fy)) ? 0 : 1;
-        break; }
+        side=(Math.min(fx,1-fx)<Math.min(fy,1-fy))?0:1; break; }
     }
-    if(!hit) { zbuf[col]=20; continue; }
-    const corr = dist*Math.cos(ra-state.dir);
-    zbuf[col]=corr;
-    const wh = Math.min(H, H/corr);
-    const y0 = HALF - wh/2;
-    const shade = Math.max(0, 1 - corr/12) * (side? .7:1);
-    const r=(90*shade)|0, g=(60*shade)|0, b=(50*shade)|0;
-    ctx.fillStyle = `rgb(${r+20},${g+15},${b})`;
-    ctx.fillRect(col, y0, 1, wh);
+    if(!hit){ zbuf[col]=24; continue; }
+    const corr=dist*Math.cos(ra-S.dir); zbuf[col]=corr;
+    const wh=Math.min(H,H/corr), y0=HALF-wh/2;
+    const sh=Math.max(0,1-corr/13)*(side?.7:1);
+    ctx.fillStyle=`rgb(${(70*sh+20)|0},${(55*sh+15)|0},${(45*sh)|0})`;
+    ctx.fillRect(col,y0,1,wh);
   }
-  drawMonsters();
+  drawSprites();
   drawGun();
+  drawMinimap();
 }
 
-// ---------- Sprites ennemis (billboards) ----------
-function drawMonsters(){
-  const list = state.monsters
-    .filter(m=>m.alive)
-    .map(m=>{ const dx=m.x-state.px, dy=m.y-state.py;
-      return {m, dx, dy, dist:Math.hypot(dx,dy)}; })
-    .sort((a,b)=>b.dist-a.dist);
-
-  for(const {m,dx,dy,dist} of list){
-    if(dist<0.2) continue;
-    let ang = Math.atan2(dy,dx) - state.dir;
-    while(ang> Math.PI) ang-=2*Math.PI;
-    while(ang<-Math.PI) ang+=2*Math.PI;
-    if(Math.abs(ang) > FOV/2 + 0.3) continue;
-    const sx = (0.5 + Math.tan(ang)/(2*Math.tan(FOV/2))) * W;
-    const size = Math.min(H, H/dist);
-    const y0 = HALF - size/2;
-    // corps
-    ctx.save();
-    ctx.globalAlpha = 1;
-    const w = size*0.6;
+// ---------- sprites (monstres + autres joueurs) ----------
+function drawSprites(){
+  const list=[];
+  for(const m of S.monsters) if(m.alive) list.push({k:"m",o:m,x:m.x,y:m.y});
+  for(const p of S.others) list.push({k:"p",o:p,x:p.x,y:p.y});
+  const tanF=Math.tan(FOV/2);
+  list.map(s=>{ s.dist=Math.hypot(s.x-S.px,s.y-S.py); return s; })
+      .sort((a,b)=>b.dist-a.dist)
+      .forEach(s=>{
+    const dx=s.x-S.px, dy=s.y-S.py, dist=s.dist;
+    if(dist<0.25) return;
+    let ang=Math.atan2(dy,dx)-S.dir;
+    while(ang>Math.PI)ang-=2*Math.PI; while(ang<-Math.PI)ang+=2*Math.PI;
+    if(Math.abs(ang)>FOV/2+0.35) return;
+    const sx=(0.5+Math.tan(ang)/(2*tanF))*W;
+    const size=Math.min(H,H/dist);
+    const y0=HALF-size/2, w=size*0.6;
+    const o=s.o;
+    const bodyCol = s.k==="m" ? (o.hurt>0?"#fff":(o.color||"#7a1f1f")) : (o.color||"#58a6ff");
     for(let i=0;i<w;i++){
-      const col = (sx - w/2 + i)|0;
-      if(col<0||col>=W) continue;
-      if(zbuf[col] < dist) continue;      // caché par un mur
-      ctx.fillStyle = m.hurt>0 ? "#fff" : "#7a1f1f";
-      ctx.fillRect(col, y0+size*0.15, 1, size*0.7);
+      const col=(sx-w/2+i)|0; if(col<0||col>=W) continue;
+      if(zbuf[col]<dist) continue;
+      ctx.fillStyle=bodyCol;
+      ctx.fillRect(col, y0+size*0.14, 1, size*0.72);
     }
     // yeux
-    ctx.fillStyle = m.hurt>0 ? "#900" : "#ffdd33";
-    const eyeY = y0+size*0.3, eyeS = Math.max(2,size*0.06);
-    ctx.fillRect(sx-size*0.15, eyeY, eyeS, eyeS);
-    ctx.fillRect(sx+size*0.09, eyeY, eyeS, eyeS);
-    ctx.restore();
-    if(m.hurt>0) m.hurt--;
-  }
+    ctx.fillStyle = s.k==="m" ? (o.hurt>0?"#900":"#ffdd33") : "#fff";
+    const eS=Math.max(2,size*0.06), eY=y0+size*0.3;
+    if(sx-size*0.15>0) ctx.fillRect(sx-size*0.15,eY,eS,eS);
+    if(sx+size*0.09<W) ctx.fillRect(sx+size*0.09,eY,eS,eS);
+    // barre de vie / nom
+    if(s.k==="m" && o.pvmax>1){
+      const bw=size*0.5, r=Math.max(0,o.hp)/o.pvmax;
+      ctx.fillStyle="#300"; ctx.fillRect(sx-bw/2, y0+size*0.05, bw, 3);
+      ctx.fillStyle="#0f0"; ctx.fillRect(sx-bw/2, y0+size*0.05, bw*r, 3);
+    }
+    if(s.k==="p"){
+      ctx.fillStyle="#fff"; ctx.font="9px monospace"; ctx.textAlign="center";
+      ctx.fillText(o.name||"P", sx, y0+size*0.02);
+    }
+    if(s.k==="m" && o.hurt>0) o.hurt--;
+  });
 }
 
-// ---------- Arme ----------
 let gunFlash=0;
 function drawGun(){
-  const gx=W/2, gy=H-64;
-  if(gunFlash>0){
-    ctx.fillStyle="rgba(255,230,120,"+(gunFlash/6)+")";
-    ctx.beginPath(); ctx.arc(gx, gy-40, 26, 0, 7); ctx.fill();
-    gunFlash--;
-  }
-  ctx.fillStyle="#3a3a3a";
-  ctx.fillRect(gx-14, gy-38, 28, 44);
-  ctx.fillStyle="#555";
-  ctx.fillRect(gx-6, gy-70, 12, 40);
-  // crosshair
-  ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=1;
-  ctx.beginPath();
+  const gx=W/2, gy=H-60;
+  if(gunFlash>0){ ctx.fillStyle="rgba(255,230,120,"+(gunFlash/6)+")";
+    ctx.beginPath(); ctx.arc(gx,gy-40,24,0,7); ctx.fill(); gunFlash--; }
+  ctx.fillStyle="#3a3a3a"; ctx.fillRect(gx-13,gy-36,26,42);
+  ctx.fillStyle="#555"; ctx.fillRect(gx-6,gy-66,12,38);
+  ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=1; ctx.beginPath();
   ctx.moveTo(W/2-6,HALF); ctx.lineTo(W/2+6,HALF);
   ctx.moveTo(W/2,HALF-6); ctx.lineTo(W/2,HALF+6); ctx.stroke();
 }
 
-// ---------- Tir ----------
-function shoot(){
-  if(state.dead) return;
-  if(state.ammo<=0){ flash("CLIC ! plus de munitions"); return; }
-  state.ammo--; gunFlash=6; pushGame();
-  // le monstre le plus proche au centre de l'écran
-  let best=null, bestDist=99;
-  for(const m of state.monsters){
-    if(!m.alive) continue;
-    const dx=m.x-state.px, dy=m.y-state.py, dist=Math.hypot(dx,dy);
-    let ang=Math.atan2(dy,dx)-state.dir;
-    while(ang>Math.PI)ang-=2*Math.PI; while(ang<-Math.PI)ang+=2*Math.PI;
-    if(Math.abs(ang)<0.12 && dist<bestDist){ best=m; bestDist=dist; }
+function drawMinimap(){
+  const S0=4, ox=W-S.mw*S0-6, oy=6;
+  ctx.globalAlpha=.75;
+  for(let y=0;y<S.mh;y++) for(let x=0;x<S.mw;x++){
+    ctx.fillStyle = cellAt(x,y)? "#888":"#111";
+    ctx.fillRect(ox+x*S0, oy+y*S0, S0-0.5, S0-0.5);
   }
-  if(best){
-    best.hurt=6;
-    best.alive=false;
-    state.kills++;
-    flash("💀 FRAG !");
-    killMonsterInGrist(best);
-    pushGame();
-  }
-  syncHud();
+  for(const m of S.monsters) if(m.alive){ ctx.fillStyle=m.color||"#f33";
+    ctx.fillRect(ox+m.x*S0-1, oy+m.y*S0-1, 2.5,2.5); }
+  for(const p of S.others){ ctx.fillStyle=p.color||"#58a6ff";
+    ctx.fillRect(ox+p.x*S0-1, oy+p.y*S0-1, 2.5,2.5); }
+  ctx.fillStyle=S.myColor; ctx.fillRect(ox+S.px*S0-1.5, oy+S.py*S0-1.5, 3,3);
+  ctx.strokeStyle=S.myColor; ctx.beginPath();
+  ctx.moveTo(ox+S.px*S0, oy+S.py*S0);
+  ctx.lineTo(ox+(S.px+Math.cos(S.dir)*1.5)*S0, oy+(S.py+Math.sin(S.dir)*1.5)*S0); ctx.stroke();
+  ctx.globalAlpha=1;
 }
 
-// ---------- Dégâts / ennemis qui approchent ----------
-let dmgTimer=0;
+// ---------- Tir / combat ----------
+function shoot(){
+  if(S.dead || !S.focused) return;
+  if(S.ammo<=0){ flash("CLIC ! plus de munitions"); return; }
+  S.ammo--; gunFlash=6;
+  let best=null, bd=99;
+  for(const m of S.monsters){ if(!m.alive) continue;
+    const dx=m.x-S.px, dy=m.y-S.py, d=Math.hypot(dx,dy);
+    let a=Math.atan2(dy,dx)-S.dir; while(a>Math.PI)a-=2*Math.PI; while(a<-Math.PI)a+=2*Math.PI;
+    if(Math.abs(a)<0.13 && d<bd){ best=m; bd=d; } }
+  if(best){ best.hurt=6; best.hp=(best.hp||1)-1;
+    if(best.hp<=0){ best.alive=false; S.kills++; flash("💀 FRAG !"); killMonster(best); }
+    else flash("touché ("+best.hp+" PV)"); }
+  syncHud(); pushState();
+}
+
+let dmgT=0;
 function tick(dt){
-  if(state.dead) return;
-  dmgTimer+=dt;
-  for(const m of state.monsters){
-    if(!m.alive) continue;
-    const dx=state.px-m.x, dy=state.py-m.y, d=Math.hypot(dx,dy);
-    if(d<6 && d>0.6){                       // avance vers le joueur
-      const sp=0.4*dt;
+  if(!S.focused || S.dead) return;
+  dmgT+=dt;
+  for(const m of S.monsters){ if(!m.alive) continue;
+    const dx=S.px-m.x, dy=S.py-m.y, d=Math.hypot(dx,dy);
+    if(d<6.5 && d>0.7){ const sp=(m.speed||0.4)*dt;
       const nx=m.x+dx/d*sp, ny=m.y+dy/d*sp;
-      if(cell(nx,m.y)===0) m.x=nx;
-      if(cell(m.x,ny)===0) m.y=ny;
-    }
-    if(d<0.9 && dmgTimer>0.8){              // touche le joueur
-      dmgTimer=0; damage(10);
-    }
+      if(cellAt(nx,m.y)===0) m.x=nx;
+      if(cellAt(m.x,ny)===0) m.y=ny; }
+    if(d<0.95 && dmgT>0.7){ dmgT=0; damage(m.dmg||10); }
   }
 }
-function damage(n){
-  state.pv=Math.max(0,state.pv-n);
-  flash("💥 -"+n+" PV"); pushGame(); syncHud();
-  if(state.pv<=0) die();
-}
-function die(){
-  state.dead=true;
+function damage(n){ if(S.dead) return; S.pv=Math.max(0,S.pv-n);
+  flash("💥 -"+n+" PV"); syncHud(); pushState(); if(S.pv<=0) die(); }
+function die(){ if(S.dead) return; S.dead=true;
   document.getElementById("dead").style.display="flex";
-}
-function revive(){
-  state.dead=false;
+  logLeaderboard(); pushState(); }
+function respawn(){ S.dead=false; S.deadLogged=false;
   document.getElementById("dead").style.display="none";
-}
+  S.pv=100; S.ammo=50; S.px=1.5; S.py=1.5; S.dir=0;
+  syncHud(); pushState(); flash("↻ respawn"); }
 
 // ---------- HUD ----------
 function flash(t){ const m=document.getElementById("msg"); m.textContent=t;
   m.classList.add("show"); clearTimeout(m._t); m._t=setTimeout(()=>m.classList.remove("show"),900); }
 function syncHud(){
-  document.querySelector("#pv .val").textContent=state.pv;
-  document.getElementById("pv").classList.toggle("low", state.pv<=30);
-  document.getElementById("ammov").textContent=state.ammo;
-  document.getElementById("killsv").textContent=state.kills;
-  const alive=state.monsters.filter(m=>m.alive).length;
-  document.getElementById("alivev").textContent=alive;
+  document.querySelector("#pv .val").textContent=Math.round(S.pv);
+  document.getElementById("pv").classList.toggle("low", S.pv<=30);
+  document.getElementById("ammov").textContent=S.ammo;
+  document.getElementById("killsv").textContent=S.kills;
+  document.getElementById("rangv").textContent=S.rang||"—";
+  document.getElementById("alivev").textContent=S.monsters.filter(m=>m.alive).length;
   document.getElementById("face").textContent =
-    state.dead? "💀" : state.pv<=30? "😱" : state.pv<=70? "😖" : "😀";
+    S.dead?"💀": S.pv<=30?"😱": S.pv<=70?"😖":"😀";
 }
 
 // ---------- Entrées ----------
 const keys={};
-addEventListener("keydown",e=>{ keys[e.key.toLowerCase()]=true;
-  if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(e.key.toLowerCase())) e.preventDefault();
-  if(e.key===" ") shoot(); });
+function focusGame(){ if(!S.focused){ S.focused=true;
+  document.getElementById("hint").classList.add("hide"); } cv.focus(); }
+addEventListener("keydown",e=>{ const k=e.key.toLowerCase(); keys[k]=true;
+  focusGame();
+  if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k)) e.preventDefault();
+  if(k===" ") shoot();
+  if(k==="r" && S.dead) respawn(); });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-cv.addEventListener("click",shoot);
+cv.addEventListener("mousedown",()=>{ focusGame(); shoot(); });
 
 function input(dt){
-  if(state.dead) return;
+  if(!S.focused || S.dead) return;
   const rot=2.4*dt, mv=2.6*dt;
-  if(keys["a"]||keys["arrowleft"]) state.dir-=rot;
-  if(keys["e"]||keys["arrowright"]) state.dir+=rot;
-  const c=Math.cos(state.dir), s=Math.sin(state.dir);
-  let nx=state.px, ny=state.py;
+  if(keys["a"]||keys["arrowleft"]) S.dir-=rot;
+  if(keys["e"]||keys["arrowright"]) S.dir+=rot;
+  const c=Math.cos(S.dir), s=Math.sin(S.dir);
+  let nx=S.px, ny=S.py;
   if(keys["z"]||keys["w"]||keys["arrowup"]){ nx+=c*mv; ny+=s*mv; }
   if(keys["s"]||keys["arrowdown"]){ nx-=c*mv; ny-=s*mv; }
   if(keys["q"]){ nx+=s*mv; ny-=c*mv; }
   if(keys["d"]){ nx-=s*mv; ny+=c*mv; }
-  if(cell(nx,state.py)===0) state.px=nx;
-  if(cell(state.px,ny)===0) state.py=ny;
+  if(cellAt(nx,S.py)===0) S.px=nx;
+  if(cellAt(S.px,ny)===0) S.py=ny;
+  if(nx!==S.px||ny!==S.py||keys["a"]||keys["e"]) pushState();
 }
 
 // ---------- Boucle ----------
 let last=0;
-function loop(t){
-  const dt=Math.min(0.05,(t-last)/1000||0); last=t;
-  if(state.started){ input(dt); tick(dt); render(); }
-  requestAnimationFrame(loop);
-}
+function loop(t){ const dt=Math.min(0.05,(t-last)/1000||0); last=t;
+  input(dt); tick(dt); render(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 
-document.getElementById("start").addEventListener("click",()=>{
-  document.getElementById("start").style.display="none";
-  state.started=true;
-  if(!GRIST_ON) seedDefaultMonsters();  // mode démo hors Grist
-  syncHud();
-});
-
-/* =========================================================================
+/* ===================================================================
    PONT GRIST
-   ========================================================================= */
-let GRIST_ON=false, gristReady=false;
-let writeGuard={pv:null,ammo:null,kills:null};
-const linkEl=document.getElementById("link");
+   =================================================================== */
+let GRIST=false, ready=false;
+const link=document.getElementById("link"), tag=document.getElementById("tag");
+tag.textContent="P"+PID; tag.style.background=S.myColor; tag.style.color="#000";
 
-function seedDefaultMonsters(){
-  state.monsters=[
-    {id:-1,x:8,y:3,alive:true,hurt:0},
-    {id:-2,x:11,y:9,alive:true,hurt:0},
-    {id:-3,x:5,y:11,alive:true,hurt:0},
-    {id:-4,x:13,y:5,alive:true,hurt:0},
-  ];
+// garde anti-boucle : dernières valeurs qu'on a écrites
+const guard={PosX:null,PosY:null,Dir:null,PV:null,Munitions:null,Kills:null};
+function extChanged(v,g,eps){ return typeof v==="number" && (g===null || Math.abs(v-g)>eps); }
+
+function applyGame(g){
+  if(!PRIMARY) return; // le joueur 2 lit son état dans Joueurs
+  let hud=false;
+  if(extChanged(g.PosX,guard.PosX,0.06)){ S.px=g.PosX; guard.PosX=g.PosX; flash("✎ Grist: X="+g.PosX.toFixed(1)); }
+  if(extChanged(g.PosY,guard.PosY,0.06)){ S.py=g.PosY; guard.PosY=g.PosY; }
+  if(extChanged(g.Dir,guard.Dir,0.06)){ S.dir=g.Dir; guard.Dir=g.Dir; }
+  if(extChanged(g.PV,guard.PV,0.5)){ const wasDead=S.dead; S.pv=g.PV; guard.PV=g.PV;
+    if(S.pv>0 && wasDead) respawnFromGrist();
+    if(S.pv<=0 && !wasDead) die();
+    flash("✎ Grist: PV="+g.PV); hud=true; }
+  if(extChanged(g.Munitions,guard.Munitions,0.5)){ S.ammo=g.Munitions; guard.Munitions=g.Munitions; flash("✎ Grist: munitions="+g.Munitions); hud=true; }
+  if(extChanged(g.Kills,guard.Kills,0.5)){ S.kills=g.Kills; guard.Kills=g.Kills; hud=true; }
+  if(typeof g.Rang==="string"){ S.rang=g.Rang; hud=true; }
+  if(hud) syncHud();
 }
+function respawnFromGrist(){ S.dead=false; S.deadLogged=false;
+  document.getElementById("dead").style.display="none";
+  if(S.px<=0||S.py<=0){ S.px=1.5; S.py=1.5; } flash("✎ ressuscité par Grist"); }
 
-try {
-  if (typeof grist !== "undefined" && grist.ready) {
-    GRIST_ON=true;
-    grist.ready({ requiredAccess:"full" });
-
-    // Table "Game" (celle sur laquelle le widget est posé) → HUD
-    grist.onRecords(async (records) => {
-      gristReady=true;
-      linkEl.textContent="GRIST: connecté"; linkEl.className="on";
-      if(records && records.length){
-        const g=records[0];
-        applyGameFromGrist(g);
-      }
-      await pullMonsters();
-    });
-
-    // rafraîchit les monstres régulièrement (autre table)
-    setInterval(()=>{ if(gristReady) pullMonsters(); }, 1500);
-  }
-} catch(e){ console.warn("Grist indisponible:", e); }
-
-// Grist → jeu (avec garde anti-boucle)
-function applyGameFromGrist(g){
-  if(typeof g.PV==="number" && g.PV!==writeGuard.pv){
-    const wasDead=state.dead;
-    state.pv=g.PV;
-    if(state.pv>0 && wasDead) revive();
-    if(state.pv<=0 && !wasDead) die();
-    flash("✎ Grist: PV = "+g.PV);
-  }
-  if(typeof g.Munitions==="number" && g.Munitions!==writeGuard.ammo){
-    state.ammo=g.Munitions; flash("✎ Grist: munitions = "+g.Munitions);
-  }
-  if(typeof g.Kills==="number") state.kills=g.Kills;
-  syncHud();
+// écriture d'état (throttle)
+let pushPending=false, lastPush=0;
+function pushState(){ if(!GRIST||!ready) return; pushPending=true;
+  const now=performance.now();
+  if(now-lastPush>350) flushPush();
 }
-
-// jeu → Grist (Game, 1 ligne). Débounce léger.
-let pushT=null;
-function pushGame(){
-  if(!GRIST_ON) return;
-  writeGuard={pv:state.pv,ammo:state.ammo,kills:state.kills};
-  clearTimeout(pushT);
-  pushT=setTimeout(async ()=>{
-    try{
-      const t=grist.getTable();
-      const data=await grist.docApi.fetchTable("Game");
-      if(data.id && data.id.length){
-        await t.update({id:data.id[0],
-          fields:{PV:state.pv,Munitions:state.ammo,Kills:state.kills}});
-      } else {
-        await t.create({fields:{PV:state.pv,Munitions:state.ammo,Kills:state.kills}});
-      }
-    }catch(e){ console.warn("pushGame",e); }
-  },120);
-}
-
-// Monstres depuis Grist → état
-async function pullMonsters(){
+async function flushPush(){
+  if(!pushPending) return; pushPending=false; lastPush=performance.now();
   try{
-    const d=await grist.docApi.fetchTable("Monstres");
-    if(!d.id) return;
-    const seen=new Set();
-    for(let i=0;i<d.id.length;i++){
-      const id=d.id[i];
-      seen.add(id);
-      let m=state.monsters.find(o=>o.id===id);
-      const alive = d.Vivant ? !!d.Vivant[i] : true;
-      if(!m){
-        state.monsters.push({id,x:d.X[i],y:d.Y[i],alive,hurt:0});
-      } else {
-        // Grist reste maître de la position (éditable en live)
-        m.x=d.X[i]; m.y=d.Y[i];
-        if(alive && !m.alive){ m.alive=true; flash("✎ Grist: ennemi ressuscité"); }
-        else m.alive = m.alive && alive;
-      }
+    if(PRIMARY){
+      guard.PosX=S.px; guard.PosY=S.py; guard.Dir=S.dir;
+      guard.PV=S.pv; guard.Munitions=S.ammo; guard.Kills=S.kills;
+      await grist.docApi.applyUserActions([
+        ["UpdateRecord","Game",S.gameId,{PosX:S.px,PosY:S.py,Dir:S.dir,PV:S.pv,Munitions:S.ammo,Kills:S.kills}],
+        ["UpdateRecord","Joueurs",1,{PosX:S.px,PosY:S.py,Dir:S.dir,PV:S.pv,Couleur:S.myColor,Actif:true}],
+      ]);
+    } else {
+      await grist.docApi.applyUserActions([
+        ["UpdateRecord","Joueurs",PID,{PosX:S.px,PosY:S.py,Dir:S.dir,PV:S.pv,Couleur:S.myColor,Actif:true}],
+      ]);
     }
-    state.monsters=state.monsters.filter(m=>m.id<0 || seen.has(m.id));
-    syncHud();
-  }catch(e){ /* table absente → ignore */ }
+  }catch(e){ /* silencieux */ }
 }
+setInterval(flushPush, 400);
 
-async function killMonsterInGrist(m){
-  if(!GRIST_ON || m.id<0) return;
-  try{
-    await grist.docApi.applyUserActions([
-      ["UpdateRecord","Monstres",m.id,{Vivant:false}]
-    ]);
-  }catch(e){ console.warn("kill grist",e); }
-}
+async function killMonster(m){ if(!GRIST||m.id<0) return;
+  try{ await grist.docApi.applyUserActions([["UpdateRecord","Monstres",m.id,{Vivant:false,HP:0}]]); }catch(e){} }
+
+async function logLeaderboard(){ if(!GRIST||S.deadLogged) return; S.deadLogged=true;
+  try{ await grist.docApi.applyUserActions([["AddRecord","Leaderboard",null,
+    {Kills:S.kills,Score:S.kills*100,Rang:S.rang||"",Fin:new Date().toLocaleString('fr-FR')}]]); }catch(e){} }
+
+// lecture périodique des autres tables
+async function pullMap(){ try{
+  const d=await grist.docApi.fetchTable("Carte"); if(!d.id||!d.id.length) return;
+  const rows=[]; for(let i=0;i<d.id.length;i++){ const y=d.Y[i];
+    const r=[]; for(let x=0;x<16;x++) r.push(d["C"+x] && d["C"+x][i] ? 1:0); rows[y]=r; }
+  const clean=rows.filter(Boolean);
+  if(clean.length){ S.map=clean; S.mh=clean.length; S.mw=clean[0].length; }
+}catch(e){} }
+
+async function pullMonsters(){ try{
+  const d=await grist.docApi.fetchTable("Monstres"); if(!d.id) return;
+  const seen=new Set(), list=[];
+  for(let i=0;i<d.id.length;i++){ const id=d.id[i]; seen.add(id);
+    if(typeof d.X[i]!=="number"||typeof d.Y[i]!=="number") continue;
+    const prev=S.monsters.find(o=>o.id===id);
+    list.push({ id, x:(prev&&prev.moved)?prev.x:d.X[i], y:(prev&&prev.moved)?prev.y:d.Y[i],
+      alive: d.Vivant? !!d.Vivant[i] : true,
+      hp: (prev&&prev.alive)? prev.hp : (d.HP&&d.HP[i]?d.HP[i]:(d.PVmax&&d.PVmax[i]?d.PVmax[i]:1)),
+      pvmax: (d.PVmax&&d.PVmax[i])?d.PVmax[i]:1,
+      color:(d.Couleur&&d.Couleur[i])?d.Couleur[i]:"#7a1f1f",
+      speed:(d.Vitesse&&d.Vitesse[i])?d.Vitesse[i]:0.4,
+      dmg:(d.Degats&&d.Degats[i])?d.Degats[i]:10,
+      hurt: prev?prev.hurt:0, moved:true });
+  }
+  S.monsters=list; syncHud();
+}catch(e){} }
+
+async function pullPlayers(){ try{
+  const d=await grist.docApi.fetchTable("Joueurs"); if(!d.id) return;
+  const list=[];
+  for(let i=0;i<d.id.length;i++){ const id=d.id[i]; if(id===PID) continue;
+    if(!d.Actif || !d.Actif[i]) continue;
+    if(typeof d.PosX[i]!=="number") continue;
+    list.push({ id, x:d.PosX[i], y:d.PosY[i], dir:d.Dir?d.Dir[i]:0,
+      pv:d.PV?d.PV[i]:100, color:(d.Couleur&&d.Couleur[i])?d.Couleur[i]:"#58a6ff",
+      name:(d.Nom&&d.Nom[i])?d.Nom[i]:"P"+id }); }
+  S.others=list;
+}catch(e){} }
+
+try{
+  if(typeof grist!=="undefined" && grist.ready){
+    GRIST=true;
+    grist.ready({requiredAccess:"full"});
+    grist.onRecords(async(records)=>{
+      ready=true; link.textContent="GRIST: connecté"; link.className="on";
+      if(PRIMARY && records && records.length){ S.gameId=records[0].id; applyGame(records[0]); }
+      await Promise.all([pullMap(),pullMonsters(),pullPlayers()]);
+      if(!PRIMARY) await initSecondary();
+    });
+    setInterval(()=>{ if(ready){ pullMonsters(); pullPlayers(); } }, 700);
+    setInterval(()=>{ if(ready) pullMap(); }, 1600);
+  } else {
+    // hors Grist : mode démo autonome
+    S.monsters=[{id:-1,x:8,y:3,alive:true,hp:1,pvmax:1,color:"#7a1f1f",speed:.45,dmg:10,hurt:0},
+                {id:-2,x:11,y:9,alive:true,hp:3,pvmax:3,color:"#2e8b57",speed:.3,dmg:25,hurt:0}];
+  }
+}catch(e){ console.warn("Grist indispo",e); }
+
+let secInit=false;
+async function initSecondary(){ if(secInit) return; secInit=true;
+  try{ const d=await grist.docApi.fetchTable("Joueurs");
+    const i=d.id.indexOf(PID);
+    if(i>=0 && typeof d.PosX[i]==="number"){ S.px=d.PosX[i]||1.5; S.py=d.PosY[i]||2.5;
+      S.dir=d.Dir?d.Dir[i]:0; S.pv=d.PV?d.PV[i]:100; syncHud(); }
+  }catch(e){} }
+
+syncHud();
 </script>
 </body>
 </html>
