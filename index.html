@@ -108,7 +108,7 @@ const cell = (x,y) => (x<0||y<0||x>=MW||y>=MH) ? 1 : MAP[y|0][x|0];
 
 // ---------- État ----------
 const state = {
-  px: 2.5, py: 2.5, dir: 0.0,
+  px: 1.5, py: 1.5, dir: 0.0,
   pv: 100, ammo: 50, kills: 0,
   monsters: [],           // {id,x,y,alive,hurt}
   started: false, dead: false,
@@ -335,7 +335,7 @@ function seedDefaultMonsters(){
   state.monsters=[
     {id:-1,x:8,y:3,alive:true,hurt:0},
     {id:-2,x:11,y:9,alive:true,hurt:0},
-    {id:-3,x:4,y:11,alive:true,hurt:0},
+    {id:-3,x:5,y:11,alive:true,hurt:0},
     {id:-4,x:13,y:5,alive:true,hurt:0},
   ];
 }
